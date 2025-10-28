@@ -1,32 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Cheverly Air Quality Dashboard</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cheverly Air Quality Dashboard</title>
 
-<!-- Leaflet (map) -->
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Favicon (the little icon in browser tabs) -->
+  <link rel="icon" type="image/png" href="https://upload.wikimedia.org/wikipedia/commons/7/7c/Air_quality_icon.png" />
 
-<!-- Chart.js (time series) + time adapter -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <!-- SEO + Share preview -->
+  <meta name="description" content="Live air quality monitoring dashboard for Cheverly, Maryland, displaying PM2.5 and sensor data from QuantAQ and PurpleAir." />
+  <meta property="og:title" content="Cheverly Air Quality Dashboard" />
+  <meta property="og:description" content="Live air quality monitoring dashboard for Cheverly, Maryland." />
+  <meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/6/6e/Air_pollution_skyline.jpg" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://avakarina27.github.io/Cheverly-Dash/" />
+  <meta name="twitter:card" content="summary_large_image" />
 
-<!-- Turf.js (spatial point-in-polygon) -->
-<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+  <!-- CSS + Map/Chart libraries -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
-<style>
-  :root {
-    --bg-header: #2c3e50;
-    --bg-panel: #ecf0f1;
-    --border-color: #ccc;
-    --text-dark: #2c3e50;
-    --radius: 4px;
-  }
+  <style>
+    :root {
+      --bg-header: #2c3e50;
+      --bg-panel: #ecf0f1;
+      --border-color: #ccc;
+      --radius: 4px;
+    }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      margin: 0;
+      color: #2c3e50;
+    }
+    header {
+      background: var(--bg-header);
+      color: white;
+      padding: 1em 1.5em;
+    }
+    header h2 {
+      margin: 0;
+      font-weight: 600;
+    }
+  </style>
+</head>
 
   body {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
