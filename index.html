@@ -3,460 +3,90 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cheverly Air Quality Dashboard</title>
-
-  <!-- Favicon -->
+  <title>Cheverly Air Quality</title>
   <link rel="icon" type="image/png" href="https://upload.wikimedia.org/wikipedia/commons/7/7c/Air_quality_icon.png" />
-
-  <!-- SEO + Share Metadata -->
-  <meta name="description" content="Live air quality monitoring dashboard for Cheverly, Maryland, displaying PM2.5 and sensor data from QuantAQ and PurpleAir." />
-  <meta property="og:title" content="Cheverly Air Quality Dashboard" />
-  <meta property="og:description" content="Live air quality data from Cheverly, Maryland." />
-  <meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/6/6e/Air_pollution_skyline.jpg" />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://avakarina27.github.io/Cheverly-Dash/" />
-  <meta name="twitter:card" content="summary_large_image" />
-
-  <!-- External Libraries -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-
-  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-
-  <!-- Custom Styles -->
   <link rel="stylesheet" href="style.css" />
+  <style>html{scroll-behavior:smooth}</style>
 </head>
 
 <body>
-  <header>
-    <h2>Cheverly Air Quality Monitoring Dashboard</h2>
+  <header class="topbar">
+    <div class="brand">Cheverly Air Quality</div>
+    <nav class="nav">
+      <a href="index.html" aria-current="page">Home</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="writeup.html">Community Insights</a>
+    </nav>
   </header>
 
-  <div id="layout-row">
-    <aside id="sidebar">
-      <label for="deviceSelect">Device:</label>
-      <select id="deviceSelect"></select>
-      <button id="refresh">Refresh Data</button>
-
-      <h4>Device Info</h4>
-      <pre id="deviceInfo">Select a device...</pre>
-
-      <h4>PM2.5 Legend (µg/m³)</h4>
-      <pre>
-Good           0–12
-Moderate      12–35
-Unhealthy     35–55
-Very Unhealthy >55
-      </pre>
-    </aside>
-
-    <main id="map-and-chart">
-      <div id="map"></div>
-      <canvas id="chart"></canvas>
-    </main>
-  </div>
-
-  <script>
-    /********* 1. CONFIG **********/
-
-    // PurpleAir READ API key here
-    const PURPLEAIR_API_KEY = "9ADB5C6C-A9B0-11EF-A261-42010A80000F";
-
-    // Center on Cheverly
-    const CHEVERLY_CENTER = [38.93, -76.91];
-
-    // A bounding box around Cheverly
-    const BBOX = {
-      nwlat: 38.955,
-      nwlng: -76.955,
-      selat: 38.900,
-      selng: -76.860
-    };
-
-    // Cheverly polygon (lon, lat)
-    const CHEVERLY_POLY = turf.polygon([[
-      [-76.91678436636381, 38.93522186903985],
-      [-76.9424153226023,  38.917845309789726],
-      [-76.90942709291147, 38.89295210551228],
-      [-76.86884580022874, 38.92663271296058],
-      [-76.91678436636381, 38.93522186903985]
-    ]]);
-
-    // QuantAQ "placeholder" devices so you always have at least something in Cheverly
-    const DEMO_QUANTAQ = [
-      {
-        sn: "QA123",
-        source: "QuantAQ",
-        lat: 38.93,
-        lon: -76.91,
-        pm25: 22,
-        city: "Cheverly",
-        last_seen: new Date()
-      },
-      {
-        sn: "QA456",
-        source: "QuantAQ",
-        lat: 38.925,
-        lon: -76.905,
-        pm25: 14,
-        city: "Cheverly",
-        last_seen: new Date()
-      }
-    ];
-
-    // We'll build and reuse these:
-    let devices = [];            // merged QuantAQ demo + PurpleAir live
-    let markersBySN = new Map(); // map from sn -> Leaflet layer
-    let chart;                   // Chart.js instance
-
-    /**********2. HELPERS**************/
-
-    function pmToColor(v){
-      if (v == null || isNaN(v)) return "gray";
-      if (v <= 12) return "green";
-      if (v <= 35) return "yellow";
-      if (v <= 55) return "orange";
-      return "red";
-    }
-
-    function fmtDate(d){
-      try {
-        return new Date(d).toLocaleString();
-      } catch {
-        return String(d);
-      }
-    }
-
-    // fallback chart data for when we can't get real history
-    function demoTimeseries() {
-      return Array.from({ length: 30 }, (_, i) => ({
-        t: new Date(Date.now() - i * 3600e3), // per hour
-        v: Math.random() * 30 + 10
-      }));
-    }
-
-    /**********3. PURPLEAIR FETCHES***************/
-
-    // Fetch live PurpleAir devices near Cheverly
-    async function fetchPurpleAirCheverly(){
-      if (!PURPLEAIR_API_KEY) {
-        console.warn("No PurpleAir API key set, returning [].");
-        return [];
-      }
-
-      // fields we want from PurpleAir
-      const fieldsWanted = [
-        "sensor_index",
-        "name",
-        "latitude",
-        "longitude",
-        "last_seen",
-        "pm2.5_atm",
-        "pm2.5",
-        "pm2.5_atm_a",
-        "pm2.5_atm_b",
-        "location_type"
-      ];
-
-      const url =
-        "https://api.purpleair.com/v1/sensors" +
-        `?fields=${encodeURIComponent(fieldsWanted.join(","))}` +
-        `&nwlng=${BBOX.nwlng}&nwlat=${BBOX.nwlat}` +
-        `&selng=${BBOX.selng}&selat=${BBOX.selat}` +
-        `&location_type=0`;
-
-      const res = await fetch(url, {
-        headers: {
-          "X-API-Key": PURPLEAIR_API_KEY
-        }
-      });
-
-      if (!res.ok) {
-        console.warn("PurpleAir fetch failed", res.status);
-        return [];
-      }
-
-      const json = await res.json();
-      const fields = json.fields || [];
-      const idx = (name) => fields.indexOf(name);
-
-      const iLat  = idx("latitude");
-      const iLon  = idx("longitude");
-      const iSN   = idx("sensor_index");
-      const iName = idx("name");
-      const iSeen = idx("last_seen");
-
-      // choose pm field
-      let iPM = idx("pm2.5_atm");
-      if (iPM < 0) iPM = idx("pm2.5");
-      if (iPM < 0) iPM = idx("pm2.5_atm_a");
-      if (iPM < 0) iPM = idx("pm2.5_atm_b");
-
-      let rows = (json.data || []).map(row => {
-        const lat  = Number(row[iLat]);
-        const lon  = Number(row[iLon]);
-        const sn   = String(row[iSN]);
-        const name = row[iName];
-        const pm25 = iPM >= 0 ? Number(row[iPM]) : null;
-
-        const seenUnix = row[iSeen];
-        const lastSeen = seenUnix ? new Date(Number(seenUnix) * 1000) : null;
-
-        return {
-          sn: sn,
-          source: "PurpleAir",
-          name: name,
-          lat: lat,
-          lon: lon,
-          pm25: pm25,
-          last_seen: lastSeen,
-          city: "Cheverly",
-          sensor_index: sn
-        };
-      });
-
-      rows = rows.filter(d => isFinite(d.lat) && isFinite(d.lon));
-
-      // filter devices to those INSIDE Cheverly polygon
-      rows = rows.filter(d => {
-        const pt = turf.point([d.lon, d.lat]);
-        return turf.booleanPointInPolygon(pt, CHEVERLY_POLY);
-      });
-
-      return rows;
-    }
-
-    // Fetch PM2.5 history for a specific PurpleAir sensor
-    // We'll try for ~24h of 30-min averages
-    async function fetchPurpleAirHistory(sensorIndex) {
-      if (!PURPLEAIR_API_KEY) {
-        return [];
-      }
-
-      const histFields = [
-        "time_stamp",
-        "pm2.5_atm",
-        "pm2.5",
-        "pm2.5_atm_a",
-        "pm2.5_atm_b"
-      ];
-
-      const url =
-        `https://api.purpleair.com/v1/sensors/${sensorIndex}/history` +
-        `?fields=${encodeURIComponent(histFields.join(","))}` +
-        `&average=30&n=48`;
-
-      const res = await fetch(url, {
-        headers: { "X-API-Key": PURPLEAIR_API_KEY }
-      });
-
-      if (!res.ok) {
-        console.warn("History fetch failed", res.status);
-        return [];
-      }
-
-      const json = await res.json();
-
-      const f = json.fields || [];
-      const idx = (name) => f.indexOf(name);
-
-      let iPM = idx("pm2.5_atm");
-      if (iPM < 0) iPM = idx("pm2.5");
-      if (iPM < 0) iPM = idx("pm2.5_atm_a");
-      if (iPM < 0) iPM = idx("pm2.5_atm_b");
-
-      const iTS = idx("time_stamp");
-      if (iTS < 0 || iPM < 0) {
-        console.warn("History missing needed fields");
-        return [];
-      }
-
-      const series = (json.data || []).map(row => {
-        const tsUnix = row[iTS];
-        const pmVal  = row[iPM];
-        return {
-          t: new Date(Number(tsUnix) * 1000),
-          v: pmVal !== null && pmVal !== undefined ? Number(pmVal) : null
-        };
-      }).filter(p => p.v != null && !Number.isNaN(p.v));
-
-      return series;
-    }
-
-    /*******4. UI PIECES: MAP, SIDEBAR, CHART*******/
-
-    // Map setup
-    const map = L.map("map").setView(CHEVERLY_CENTER, 12);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap"
-    }).addTo(map);
-    const layerGroup = L.layerGroup().addTo(map);
-
-    // Sidebar refs
-    const sel = document.getElementById("deviceSelect");
-    const infoBox = document.getElementById("deviceInfo");
-    const refreshBtn = document.getElementById("refresh");
-
-    // Create chart
-    const chartEl = document.getElementById("chart");
-    chart = new Chart(chartEl, {
-      type: "line",
-      data: {
-        labels: [],
-        datasets: [{
-          label: "PM2.5 (µg/m³)",
-          data: [],
-          borderColor: "#2980b9",
-          fill: false
-        }]
-      },
-      options: {
-        parsing: false,
-        scales: {
-          x: {
-            type: "time",
-            time: { unit: "hour" },
-            ticks: { maxTicksLimit: 6 }
-          },
-          y: {
-            title: { display: true, text: "µg/m³" }
-          }
-        }
-      }
-    });
-
-    /*******5. RENDER HELPERS*********/
-
-    function populateSelect() {
-      sel.innerHTML = "";
-      devices.forEach(d => {
-        const opt = document.createElement("option");
-        opt.value = d.sn;
-        opt.textContent = `${d.sn} (${d.source})`;
-        sel.appendChild(opt);
-      });
-    }
-
-    function updateMap() {
-      layerGroup.clearLayers();
-      markersBySN = new Map();
-
-      devices.forEach(d => {
-        const color = pmToColor(d.pm25);
-
-        const marker = L.circleMarker([d.lat, d.lon], {
-          radius: d.source === "PurpleAir" ? 9 : 10,
-          color,
-          fillColor: color,
-          fillOpacity: 0.8,
-          weight: 1
-        })
-        .addTo(layerGroup)
-        .bindPopup(
-          `<b>${d.sn}</b> — ${d.source}<br>` +
-          (d.pm25 != null ? `PM2.5: ${d.pm25.toFixed(1)} µg/m³<br>` : "") +
-          (d.last_seen ? `Last seen: ${fmtDate(d.last_seen)}` : "")
-        );
-
-        markersBySN.set(d.sn, marker);
-      });
-    }
-
-    function showInfo(sn){
-      const d = devices.find(x => x.sn === sn);
-      if (!d) {
-        infoBox.textContent = "Select a device...";
-        return;
-      }
-
-      infoBox.textContent =
-`Source: ${d.source}
-SN: ${d.sn}
-PM2.5: ${d.pm25 != null ? d.pm25.toFixed(1) + " µg/m³" : "N/A"}
-Last Seen: ${d.last_seen ? fmtDate(d.last_seen) : "N/A"}
-Lat/Lon: ${d.lat.toFixed(5)}, ${d.lon.toFixed(5)}`;
-
-      const m = markersBySN.get(sn);
-      if (m) {
-        m.openPopup();
-        map.panTo([d.lat, d.lon]);
-      }
-    }
-
-    async function updateChartForDevice(sn) {
-      const d = devices.find(x => x.sn === sn);
-      if (!d) return;
-
-      // Try PurpleAir history:
-      if (d.source === "PurpleAir" && d.sensor_index) {
-        try {
-          const hist = await fetchPurpleAirHistory(d.sensor_index);
-          if (hist.length > 0) {
-            chart.data.labels = hist.map(p => p.t);
-            chart.data.datasets[0].data = hist.map(p => p.v);
-            chart.data.datasets[0].label = `PM2.5 (µg/m³) - ${d.sn}`;
-            chart.update();
-            return;
-          }
-        } catch (err) {
-          console.warn("History fetch failed:", err);
-        }
-      }
-
-      // Fallback demo data if no history or it's QuantAQ
-      const demo = demoTimeseries();
-      chart.data.labels = demo.map(p => p.t);
-      chart.data.datasets[0].data = demo.map(p => p.v);
-      chart.data.datasets[0].label = `PM2.5 (µg/m³) - ${d.sn}`;
-      chart.update();
-    }
-
-    /*********6. INITIAL LOAD*************/
-
-    async function init() {
-      // start with demo QuantAQ
-      devices = [...DEMO_QUANTAQ];
-
-      // try to add PurpleAir
-      try {
-        const purpleAirDevices = await fetchPurpleAirCheverly();
-        const existing = new Set(devices.map(d => d.sn));
-        purpleAirDevices.forEach(p => {
-          if (!existing.has(p.sn)) devices.push(p);
-        });
-      } catch (err) {
-        console.warn("Error fetching PurpleAir devices:", err);
-      }
-
-      // render UI
-      populateSelect();
-      updateMap();
-
-      if (devices.length > 0) {
-        sel.value = devices[0].sn;
-        showInfo(sel.value);
-        updateChartForDevice(sel.value);
-      } else {
-        infoBox.textContent = "No devices available.";
-      }
-    }
-
-    /************7. INTERACTIONS****************/
-
-    refreshBtn.onclick = () => {
-      showInfo(sel.value);
-      updateChartForDevice(sel.value);
-    };
-
-    sel.onchange = () => {
-      showInfo(sel.value);
-      updateChartForDevice(sel.value);
-    };
-
-    init();
-  </script>
+  <!-- Hero with your existing background via style.css -->
+  <section class="hero hero--image">
+    <div class="hero__content">
+      <h1>Cleaner air, clearer choices</h1>
+      <p class="lead">
+        Track fine particle pollution in Cheverly through a live, open dashboard
+        powered by community and research sensors.
+      </p>
+      <p>
+        <a class="btn btn--primary" href="dashboard.html">Open Live Dashboard</a>
+        <a class="btn btn--ghost" href="writeup.html">Learn More</a>
+      </p>
+    </div>
+  </section>
+
+  <main class="container">
+    <!-- Five tiles in one row on desktop -->
+    <section class="tiles tiles--five">
+      <!-- 1) Time series -->
+      <a class="tile tile--blue" href="dashboard.html#chart">
+        <h3>How did the air look yesterday?</h3>
+        <p>See the day as a simple line trend</p>
+      </a>
+
+      <!-- 2) Map -->
+      <a class="tile tile--green" href="dashboard.html#map">
+        <h3>Is the air near me safe?</h3>
+        <p>Check nearby sensors on the map</p>
+      </a>
+
+      <!-- 3) Health → write-up -->
+      <a class="tile tile--orange" href="writeup.html#health">
+        <h3>Health guidance</h3>
+        <p>What the colors mean for you</p>
+      </a>
+
+      <!-- 4) Network → write-up -->
+      <a class="tile tile--purple" href="writeup.html#network">
+        <h3>About the network</h3>
+        <p>How the sensors work together</p>
+      </a>
+
+      <!-- 5) Action → write-up -->
+      <a class="tile tile--pink" href="writeup.html#action">
+        <h3>Take part</h3>
+        <p>Ways to help and stay informed</p>
+      </a>
+    </section>
+
+    <!-- Simple value add below the tiles -->
+    <section class="quick-band">
+      <div class="quick-card">
+        <h4>Today’s tip</h4>
+        <p>When the map is mostly yellow or higher, choose indoor exercise or shorten time outside.</p>
+      </div>
+      <div class="quick-card">
+        <h4>How to read the map</h4>
+        <p>Green is generally fine for most people.<p>Yellow calls for awareness.</p> Orange or above suggests caution.</p>
+      </div>
+      <div class="quick-card">
+        <h4>Stay in the loop</h4>
+        <p>Bookmark the dashboard and check the time series for a quick sense of the day.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>© 2025 Town of Cheverly</p>
+  </footer>
 </body>
 </html>

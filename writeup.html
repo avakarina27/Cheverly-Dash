@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Community Insights – Cheverly Air Quality</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">Cheverly Air Quality</div>
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="writeup.html" aria-current="page">Community Insights</a>
+    </nav>
+  </header>
+
+  <section class="writeup-hero">
+    <h1>Community Air Quality Insights</h1>
+    <p>Analysis and takeaways from Cheverly’s local sensor network</p>
+  </section>
+
+  <main class="article">
+    <section id="health"><h2>What are the health effects?</h2><p>Brief PM2.5 health guidance for sensitive groups.</p></section>
+    <section id="network"><h2>About the community network</h2><p>How sensors work, PurpleAir vs QuantAQ, and quality notes.</p></section>
+    <section id="action"><h2>Who’s taking action?</h2><p>Town actions, resident tips, and how to get involved.</p></section>
+  </main>
+
+  <footer class="footer">
+    <p>© 2025 Town of Cheverly</p>
+  </footer>
+
+  <style>
+    .writeup-hero{
+      text-align:center;
+      padding:4rem 1rem 2rem;
+      background:
+        linear-gradient(180deg,rgba(44,62,80,.75),rgba(44,62,80,.55)),
+        url("https://farm3.static.flickr.com/2249/2024469141_cbcd98a5b7.jpg")
+        center/cover no-repeat;
+      color:#fff;
+    }
+    .article{max-width:800px;margin:2rem auto;padding:0 1rem 2rem;line-height:1.6;}
+    .article h2{color:#2c3e50;scroll-margin-top:80px;}
+    html{scroll-behavior:smooth;}
+  </style>
+</body>
+</html>
