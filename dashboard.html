@@ -24,9 +24,11 @@
     .legend-box { display: flex; align-items: center; gap: .5rem; font-size: .9rem; }
     .dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; border: 1px solid #aaa; }
     .dot--good { background: green; }
-    .dot--moderate { background: yellow; }
-    .dot--unhealthy { background: orange; }
-    .dot--veryunhealthy { background: red; }
+    .dot--acceptable { background: yellow; }
+    .dot--moderate { background: orange; }
+    .dot--unhealthy { background: red; }
+    .dot--veryunhealthy { background: purple; }
+    .dot--emergency { background: maroon; }
   </style>
 </head>
 
@@ -51,10 +53,12 @@
 
       <h4>PM2.5 Legend (µg/m³)</h4>
       <div class="legend-grid">
-        <div class="legend-box"><span class="dot dot--good"></span><strong>Good</strong> 0–12</div>
-        <div class="legend-box"><span class="dot dot--moderate"></span><strong>Moderate</strong> 12–35</div>
-        <div class="legend-box"><span class="dot dot--unhealthy"></span><strong>Unhealthy</strong> 35–55</div>
-        <div class="legend-box"><span class="dot dot--veryunhealthy"></span><strong>Very Unhealthy</strong> 55+</div>
+        <div class="legend-box"><span class="dot dot--good"></span><strong>Good</strong> 0–50</div>
+        <div class="legend-box"><span class="dot dot--acceptable"></span><strong>Acceptable</strong> 51-100</div>
+        <div class="legend-box"><span class="dot dot--moderate"></span><strong>Moderate</strong> 101-150</div>
+        <div class="legend-box"><span class="dot dot--unhealthy"></span><strong>Unhealthy</strong> 151-200</div>
+        <div class="legend-box"><span class="dot dot--veryunhealthy"></span><strong>Very Unhealthy</strong> 201-300</div>
+        <div class="legend-box"><span class="dot dot--emergency"></span><strong>Emergency</strong> 301+</div>
       </div>
     </aside>
 
